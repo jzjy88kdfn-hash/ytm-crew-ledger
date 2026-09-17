@@ -21,9 +21,9 @@ async function parseResponse(r){
 
 class AuthLite{
   constructor(url,key){this.url=url;this.key=key;this.listeners=new Set()}
-  _store(session){
+  _store(session,notify=false){
     if(session)localStorage.setItem(SESSION_KEY,JSON.stringify(session));else localStorage.removeItem(SESSION_KEY);
-    this.listeners.forEach(fn=>{try{fn(session?'SIGNED_IN':'SIGNED_OUT',session)}catch{}});
+    if(notify)this.listeners.forEach(fn=>{try{fn(session?'SIGNED_IN':'SIGNED_OUT',session)}catch{}});
   }
   _normalize(tokens){
     if(!tokens?.access_token)return null;
@@ -46,7 +46,7 @@ class AuthLite{
     const s=this._normalize({
       access_token:p.get('access_token'),refresh_token:p.get('refresh_token'),token_type:p.get('token_type'),expires_in:p.get('expires_in')
     });
-    if(s){this._store(s);history.replaceState(null,'',location.pathname+location.search)}
+    if(s){this._store(s,false);history.replaceState(null,'',location.pathname+location.search)}
     return s;
   }
   async _refresh(session){
@@ -56,14 +56,14 @@ class AuthLite{
     });
     const data=await parseResponse(r);
     if(!r.ok)throw authError(data,r.status);
-    const next=this._normalize(data);this._store(next);return next;
+    const next=this._normalize(data);this._store(next,false);return next;
   }
   async _validSession(force=false){
     let s=this._fromUrl()||this._read();
     if(!s)return null;
     const now=Math.floor(Date.now()/1000);
     if(force||Number(s.expires_at||0)<=now+60){
-      try{s=await this._refresh(s)}catch{this._store(null);return null}
+      try{s=await this._refresh(s)}catch{this._store(null,true);return null}
     }
     return s;
   }
@@ -80,7 +80,7 @@ class AuthLite{
   async signOut(){
     const s=this._read();
     if(s?.access_token){try{await fetch(`${this.url}/auth/v1/logout?scope=local`,{method:'POST',headers:{apikey:this.key,Authorization:`Bearer ${s.access_token}`}})}catch{}}
-    this._store(null);return {error:null};
+    this._store(null,true);return {error:null};
   }
   onAuthStateChange(callback){this.listeners.add(callback);return {data:{subscription:{unsubscribe:()=>this.listeners.delete(callback)}}}}
 }
