@@ -12,6 +12,7 @@ function authError(data,status){
   const e=new Error(data?.msg||data?.message||data?.error_description||data?.error||`HTTP ${status}`);
   e.status=status;e.code=data?.code||null;e.details=data?.details||null;return e;
 }
+function isDefinitiveAuthFailure(error){return [400,401,403].includes(Number(error?.status))}
 async function parseResponse(r){
   if(r.status===204)return null;
   const text=await r.text();
@@ -63,19 +64,25 @@ class AuthLite{
     if(!s)return null;
     const now=Math.floor(Date.now()/1000);
     if(force||Number(s.expires_at||0)<=now+60){
-      try{s=await this._refresh(s)}catch{this._store(null,true);return null}
+      if(typeof navigator!=='undefined'&&navigator.onLine===false)return s;
+      try{s=await this._refresh(s)}catch(error){
+        if(isDefinitiveAuthFailure(error)){this._store(null,true);return null}
+        return s;
+      }
     }
     return s;
   }
   async getSession(){return {data:{session:await this._validSession()},error:null}}
   async signInWithOtp({email,options={}}){
     const redirect=options.emailRedirectTo||location.href.split('#')[0];
-    const r=await fetch(`${this.url}/auth/v1/otp?redirect_to=${encodeURIComponent(redirect)}`,{
-      method:'POST',headers:{apikey:this.key,'Content-Type':'application/json'},
-      body:JSON.stringify({email,data:{},create_user:options.shouldCreateUser!==false,gotrue_meta_security:{}})
-    });
-    const data=await parseResponse(r);
-    return r.ok?{data:{user:null,session:null},error:null}:{data:null,error:authError(data,r.status)};
+    try{
+      const r=await fetch(`${this.url}/auth/v1/otp?redirect_to=${encodeURIComponent(redirect)}`,{
+        method:'POST',headers:{apikey:this.key,'Content-Type':'application/json'},
+        body:JSON.stringify({email,data:{},create_user:options.shouldCreateUser!==false,gotrue_meta_security:{}})
+      });
+      const data=await parseResponse(r);
+      return r.ok?{data:{user:null,session:null},error:null}:{data:null,error:authError(data,r.status)};
+    }catch(error){return {data:null,error}}
   }
   async signOut(){
     const s=this._read();
