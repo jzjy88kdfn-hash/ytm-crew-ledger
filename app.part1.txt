@@ -5,7 +5,8 @@ const sb=createClient(C.supabaseUrl,C.supabasePublishableKey,{auth:{persistSessi
 const $=s=>document.querySelector(s); const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const yen=n=>new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(Number(n||0));
 const fmt=d=>d?new Date(d+'T00:00:00').toLocaleDateString('ja-JP'):'';
-const today=()=>new Date().toISOString().slice(0,10);
+const localDateKey=(d=new Date())=>{const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`};
+const today=()=>localDateKey();
 let state={page:'home',session:null,partners:[],attendance:[],documents:[],workers:[],photos:[],selected:null,online:navigator.onLine};
 const nav=[['home','HOME'],['attendance','出面'],['partners','協力会社'],['alerts','期限'],['roster','作業員'],['audit','監査']];
 
@@ -33,7 +34,7 @@ async function log(entity_type,entity_id,action,summary,before_data=null,after_d
 function partner(id){return state.partners.find(x=>x.id===id)}
 function photo(id){return state.photos.find(x=>x.partner_id===id)}
 async function signed(path){if(!path)return null;const {data}=await sb.storage.from(C.storageBucket).createSignedUrl(path,3600);return data?.signedUrl||null}
-function expiryKind(d,required=true){if(!required)return ['期限なし','ok'];if(!d)return ['未登録',''];const a=new Date(today()),b=new Date(d+'T00:00:00');const days=Math.ceil((b-a)/86400000);if(days<0)return ['期限切れ','danger'];if(days<=7)return [`残り${days}日`,'warn'];if(days<=30)return [`残り${days}日`,'warn'];return ['有効','ok']}
+function expiryKind(d,required=true){if(!required)return ['期限なし','ok'];if(!d)return ['未登録',''];const [y,m,day]=d.split('-').map(Number);const a=new Date();a.setHours(0,0,0,0);const b=new Date(y,m-1,day);const days=Math.round((b-a)/86400000);if(days<0)return ['期限切れ','danger'];if(days<=7)return [`残り${days}日`,'warn'];if(days<=30)return [`残り${days}日`,'warn'];return ['有効','ok']}
 function monthRows(){const m=today().slice(0,7);return state.attendance.filter(x=>x.work_date?.startsWith(m))}
 function alerts(){return state.documents.map(d=>{const [text,kind]=expiryKind(d.expires_on,d.expiry_required);return {...d,_text:text,_kind:kind}}).filter(d=>d._kind==='danger'||d._kind==='warn'||(!d.expires_on&&d.expiry_required));}
 
