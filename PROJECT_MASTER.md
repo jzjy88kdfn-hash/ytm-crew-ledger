@@ -2,7 +2,7 @@
 
 正本ID: YTM-CREW-MASTER
 更新日: 2026-09-18
-状態: STEP 7 実装継続中 / 本番未承認
+状態: STEP 8 内部QA・耐障害性是正中 / 本番未承認
 
 このファイルを仕様・進行・完成判定の唯一の正本とする。README、旧Excel、旧VBA、会話、試作品は参照資料であり、この正本と矛盾した場合は本書を優先する。
 
@@ -110,14 +110,14 @@ G7 本番: GitHub Pages本番URL、Home Screen、キャッシュ更新、実デ�
 
 ## 12. 現在地（2026-09-18）
 - G1: PASS
-- G2: PARTIAL。主要入力・検索・状態管理・取消復旧・オフラインキュー・JSONバックアップは実装済み。第5号系帳票の確定出力とバックアップ復元が未実装
-- G3: PARTIAL。Supabase Security Advisorは指摘0。DB trigger/constraint実装済み。ブラウザ実行・Auth/REST/Storage往復・オフライン再送の総合QA未完了
+- G2: PASS。登録/編集、出面、写真、証明書、期限、作業員、検索、監査、履歴、JSONバックアップ/復元、IndexedDB未送信復旧、第5号系帳票出力のコードが存在
+- G3: PARTIAL。GitHub Actions静的QA PASS、Supabase RLS/Storage/生成列/監査trigger確認済み、Security Advisor 0、Performance WARN/ERROR 0。本人Authを要するREST/Storage/正常系・異常系の実往復が未実施
 - G4: FAIL。本人Auth/iPhone/Windows同期の実機証拠なし
-- G5: FAIL。Red Team未完了
+- G5: FAIL。Red Team実行証拠未完了
 - G6: FAIL。日常/復旧/バックアップ運用未確定
 - G7: FAIL。GitHub Pages本番・実データ往復未確認
 
-## 13. 2026-09-18までに是正済み
+## 13. 2026-09-18までに是正・実装済み
 - 日本時間0:00〜8:59に前日となるUTC日付処理をローカル日付処理へ変更
 - `app.part*.txt` 分割実行を廃止し `app.js` へ一本化
 - 外部 `esm.sh` 依存を同一Origin `vendor/supabase-lite.js` へ置換するimport mapを実装
@@ -129,29 +129,35 @@ G7 本番: GitHub Pages本番URL、Home Screen、キャッシュ更新、実デ�
 - 一般情報の確認状態・根拠欄を実装
 - 作業員情報編集を実装
 - 期限7日/8〜30日を分離
-- JSONメタデータバックアップを実装
+- JSONメタデータバックアップと復元画面を実装
+- 第5号系A3横帳票 `roster-print.html` を実装
 - DB側自動変更履歴triggerを実装
 - `updated_at` DB triggerを実装
 - 写真差替え時旧Storage object削除、DB失敗時新object掃除を実装
 - モバイル下部ナビで6機能すべて表示
 - Auth token refresh時の再帰イベント発火を抑止
+- 一時的な通信失敗/5xxで保存済みsessionを消さないようAuth refreshを強化
+- `qa/static-check.mjs` と `.github/workflows/qa.yml` を追加し、作業branch pushごとの自動静的QAを固定
+- 最新GitHub Actions `Internal QA` run 35267130306 success
+- Supabase Performance Advisorの旧RLS initplan WARN 7件を解消。現在WARN/ERROR 0、未使用index INFOのみ
 
 ## 14. 未完了の重大/重要課題
+P0: Supabase `auth.users=0`。本人Magic Linkの初回認証がまだ一度も成立していない
 P0: 本人ログイン→保存→再読込→別端末同期の実機証拠がない
 P0: IndexedDB未送信queueをiPhone Safari実機で通信断→終了→再起動→再接続まで未検証
 P0: `vendor/supabase-lite.js` のAuth/PostgREST/Storage互換性を実認証で未検証
-P1: 第5号系帳票の確定レイアウト出力がない
-P1: JSONバックアップはメタデータ出力のみで、復元処理・Storage原本復旧方針が未完成
-P1: Supabase Performance AdvisorのRLS initplan WARNが実ポリシー表示と不整合で、原因未確定
-P1: GitHub Pages未公開
+P1: 未送信queueの同時flush競合、証明書/写真の二重操作をRed Teamで重点確認する
+P1: 未来日など異常日付の拒否条件をRed Teamで確認し、不足時は入力防御を追加する
+P1: 第5号系帳票はコード実装済みだが実データ印刷/PDFの視認確認がない
+P1: JSON復元はStorage原本そのものを含まないため、原本ファイルの別バックアップ方針をG6で確定する
+P1: GitHub Pages候補公開とMagic Link callbackの実機確認が未実施
 
 ## 15. 次の固定順序
-1. G2残作業（帳票・復元）
-2. `QA_MATRIX.md` に基づく静的QA + DB QA
-3. Red Team内部実行
-4. Draft PR作成
-5. GitHub Pages候補公開
-6. iPhone/Windows実機・実データ往復
-7. 不具合修正→再検証
-8. 運用手順確定
-9. mainへ本番収束
+1. STEP 8残り: ユーザー操作不要の内部QA・既知異常系のコード是正
+2. Draft PR作成（mainへはmergeしない）
+3. HTTPS候補URLを用意し、本人Magic Link初回認証を1回だけ実施
+4. Auth/REST/Storage正常系QA → Red Team → オフライン復旧QA
+5. Windows/iPhone相互同期・帳票・Home Screen実機確認
+6. 不具合修正→全QA再実行
+7. 日常/バックアップ/復旧手順確定
+8. G1〜G7全PASS確認後のみmainへ本番収束
