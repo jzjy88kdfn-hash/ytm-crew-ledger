@@ -2,7 +2,7 @@
 
 正本ID: YTM-CREW-MASTER
 更新日: 2026-09-18
-状態: 実装継続中 / 本番未承認
+状態: STEP 7 実装継続中 / 本番未承認
 
 このファイルを仕様・進行・完成判定の唯一の正本とする。README、旧Excel、旧VBA、会話、試作品は参照資料であり、この正本と矛盾した場合は本書を優先する。
 
@@ -13,9 +13,10 @@
 - 利用者: 本人1名
 - 端末: Windows PC + iPhone
 - 表層: 日本語PWA
-- 正本DB: Supabase `gxpthkgvqyagfmbwcodm`。既存名は `ytm-fieldops-prd` だが、本案件専用として使用中
+- 正本DB: Supabase `gxpthkgvqyagfmbwcodm`。既存名は `ytm-fieldops-prd` だが、本案件用として使用
 - ファイル正本: private Storage `crew-ledger-private`
-- ソース: GitHub `jzjy88kdfn-hash/ytm-crew-ledger`
+- ソース正本: GitHub `jzjy88kdfn-hash/ytm-crew-ledger`
+- 作業branch: `recovery/production-gates`
 - 認証: 本人メールのみ許可。ブラウザへservice_role/DB passwordを置かない
 - 作業員名簿: 全建統一様式第5号 改訂6版（令和6年10月）を基準データとし、元請独自様式は正本から出力する
 
@@ -25,7 +26,8 @@
 - 過去出面は登録時単価スナップショットを保持し、後日の単価変更で再計算しない
 - インボイスなしは元単価を保持し、支払単価を8%減額する。1円未満処理は現DBの切捨てを暫定採用し、実運用前に事業判断ゲートで確認する
 - iPhoneのバックグラウンド常時実行を前提にしない
-- 通信断でも既存データを失わない設計にする。未送信データは復旧可能にする
+- 通信断でも既存データを失わない。未送信は送信完了まで端末から消さない
+- コード生成・画面表示だけを完成証拠にしない
 
 ## 4. 出力
 - 協力会社プロフィール
@@ -37,13 +39,12 @@
 
 ## 5. 資産判定
 ### 採用
-- GitHub PWA: index.html / styles.css / manifest.webmanifest / sw.js / config.js / assets
+- PWA: `index.html` / `styles.css` / `app.js` / `manifest.webmanifest` / `sw.js` / `config.js` / `assets` / `vendor/supabase-lite.js`
 - Supabase: partners / attendance / worker_profiles / documents / profile_photos / change_log
 - RLS、本人メール制限、private Storage
-- 旧Excelで確定した業務ルール（登録区分、単価、期限、作業員名簿項目）
+- 旧Excelで確定した業務ルール
 
 ### 部分採用
-- app.js + app.part*.txt: 業務ロジックは採用。ただし分割ローダー、外部CDN依存、オフライン設計、日付処理を是正する
 - 旧Excel UI: 項目・帳票要件のみ参照。主UIとしては廃止
 - 旧VBA: 業務ルールと検証観点のみ参照。実行基盤としては廃止
 
@@ -56,6 +57,8 @@
 
 ### 廃止
 - Excel/VBAを正本DBまたは主操作画面とする案
+- `app.part*.txt` 実行時結合方式
+- 外部CDNがなければアプリ自体が起動しない構造
 - 同一ルールを複数資料へ重複して凍結する運用
 - コードが存在するだけで「実装済み」と判定する運用
 
@@ -69,12 +72,12 @@
 HOME / 出面 / 協力会社 / 期限 / 作業員 / 監査。日常操作を優先し、内部用語・DB状態・技術設定を通常画面へ出さない。
 
 ### 内部
-UUID、owner_id、RLS、単価スナップショット、原本Storage path、確認状態、変更履歴、未送信キュー、監査ルール、例外記録、バックアップ、リリース番号を保持する。
+UUID、owner_id、RLS、単価スナップショット、原本Storage path、確認状態、変更履歴、未送信キュー、監査ルール、取消履歴、バックアップ、リリース番号を保持する。
 
 ## 7. 状態管理
-情報状態は `確定 / 確認済み / 申告 / 推定 / 未確認 / 矛盾 / 対象外` を標準語彙とする。既存 `documents.read_status` は `確定 / 未確認 / 読取不能 / 要確認` の証明書読取専用状態として残す。一般情報の状態・根拠管理は内部メタデータとして実装する。
+一般情報状態は `確定 / 確認済み / 申告 / 推定 / 未確認 / 矛盾 / 対象外`。`documents.read_status` は `確定 / 未確認 / 読取不能 / 要確認` の証明書読取専用状態として残す。
 
-不明は放置せず、確認対象・確認方法・根拠資料・担当・期限を内部監査項目へ落とす。
+未確認情報には確認対象・確認方法・根拠を残す。推測値を確定値へ昇格させない。
 
 ## 8. 主要業務ルール
 - 登録区分: 法人 / 個人事業主・一人親方 / 個人応援・屋号なし
@@ -83,15 +86,16 @@ UUID、owner_id、RLS、単価スナップショット、原本Storage path、�
 - LINE/メールは連絡可否のみ保持
 - インボイスありは登録番号必須
 - 出面: 日付 / 人物 / 現場 / 作業内容 / 人工 / 適用単価 / 経費 / 備考
+- 出面取消は物理削除せず `voided_at` 等で履歴を残す。復旧可能とする
 - 証明書は人物登録後に追加
-- 期限: 期限切れ赤 / 7日以内警告 / 30日以内注意 / 未登録要確認
+- 期限: 期限切れ赤 / 7日以内警告 / 8〜30日注意 / 未登録要確認
 - 生年月日から年齢を表示時算出し、年齢自体を正本保存しない
 
 ## 9. 例外・Red Team必須ケース
-入力不足、二重登録、二重タップ、通信断、送信途中終了、古いキャッシュ、Storage upload成功後DB失敗、DB成功後画面更新失敗、写真差替え時の旧ファイル残存、削除/取消、日付境界、iPhone再起動、セッション切れ、1500件超出面、大量証明書、同名人物、単価変更後の過去出面、1年後の期限、元請様式追加を試験対象とする。
+入力不足、二重登録、二重タップ、通信断、送信途中終了、古いキャッシュ、Storage upload成功後DB失敗、DB成功後画面更新失敗、写真差替え時の旧ファイル残存、取消/復旧、日付境界、iPhone再起動、セッション切れ、1500件超出面、大量証明書、同名人物、単価変更後の過去出面、1年後の期限、元請様式追加を試験対象とする。
 
 ## 10. 変更管理
-本番変更は `recovery/production-gates` 等の作業branch → 静的/自動QA → 実機確認 → main merge の順。main直書きを通常運用にしない。変更前/後、理由、影響、日付、再検証要否をcommit/DB change_logへ残す。
+本番変更は作業branch → 静的/自動QA → 実機確認 → main merge。main直書きを通常運用にしない。変更前/後、理由、影響、日付、再検証要否をcommit/DB change_logへ残す。
 
 ## 11. 完了ゲート
 G1 設計: 目的・前提・制約・出力・主要機能・例外・保存先が本書に定義済み
@@ -102,33 +106,51 @@ G5 Red Team: 重大問題0、復旧不能0、未検証重大ケース0
 G6 運用: 説明書を読まなくても主要操作を完了でき、日常/変更/バックアップ/復旧手順が確定
 G7 本番: GitHub Pages本番URL、Home Screen、キャッシュ更新、実データ1件の往復確認がPASS
 
-全G1〜G7 PASS時のみ「完成」。それ以前は完成と呼ばない。
+全G1〜G7 PASS時のみ「完成」。
 
-## 12. 現在地（2026-09-18監査）
-- G1: PASS（本書で再定義）
-- G2: FAIL。検索、一般情報状態管理、バックアップ、帳票出力、オフライン未送信復旧、削除/取消等が不足
-- G3: PARTIAL。Supabase Security Advisorは指摘0。Performance AdvisorはRLS関連WARN 7件を表示。コード総合QA未完了
+## 12. 現在地（2026-09-18）
+- G1: PASS
+- G2: PARTIAL。主要入力・検索・状態管理・取消復旧・オフラインキュー・JSONバックアップは実装済み。第5号系帳票の確定出力とバックアップ復元が未実装
+- G3: PARTIAL。Supabase Security Advisorは指摘0。DB trigger/constraint実装済み。ブラウザ実行・Auth/REST/Storage往復・オフライン再送の総合QA未完了
 - G4: FAIL。本人Auth/iPhone/Windows同期の実機証拠なし
 - G5: FAIL。Red Team未完了
-- G6: FAIL。運用開始手順未確定
+- G6: FAIL。日常/復旧/バックアップ運用未確定
 - G7: FAIL。GitHub Pages本番・実データ往復未確認
 
-## 13. 既知の重大/重要課題
-P0: JavaScriptの日付がUTC基準で、日本時間0:00〜8:59に前日扱いとなる可能性がある
-P0: オフラインは画面シェルのキャッシュ中心で、業務データ再読込/未送信復旧が未完成
-P0: 本人ログイン→保存→再読込→別端末同期の実機証拠がない
-P1: app.part*.txtを実行時結合する暫定構造と外部CDN依存を解消する
-P1: 作業員名簿は一覧表示のみで編集・帳票出力が未完成
-P1: 変更履歴がアプリ呼出依存で、DB側強制監査になっていない
-P1: 検索・バックアップ・取消/復旧導線がない
-P2: 期限30日以内と7日以内の表示区分をUI上さらに明確化
+## 13. 2026-09-18までに是正済み
+- 日本時間0:00〜8:59に前日となるUTC日付処理をローカル日付処理へ変更
+- `app.part*.txt` 分割実行を廃止し `app.js` へ一本化
+- 外部 `esm.sh` 依存を同一Origin `vendor/supabase-lite.js` へ置換するimport mapを実装
+- Service Workerを同一Origin静的資産だけのキャッシュへ制限
+- IndexedDB snapshot + 未送信queueを実装
+- 出面1500件上限をページング取得へ変更
+- 出面取消/復旧を履歴保持方式で実装
+- 協力会社検索を実装
+- 一般情報の確認状態・根拠欄を実装
+- 作業員情報編集を実装
+- 期限7日/8〜30日を分離
+- JSONメタデータバックアップを実装
+- DB側自動変更履歴triggerを実装
+- `updated_at` DB triggerを実装
+- 写真差替え時旧Storage object削除、DB失敗時新object掃除を実装
+- モバイル下部ナビで6機能すべて表示
+- Auth token refresh時の再帰イベント発火を抑止
 
-## 14. 次の固定順序
-1. P0/P1設計是正
-2. 実装
-3. 静的QA + DB QA
-4. Red Team
-5. GitHub Pages公開
+## 14. 未完了の重大/重要課題
+P0: 本人ログイン→保存→再読込→別端末同期の実機証拠がない
+P0: IndexedDB未送信queueをiPhone Safari実機で通信断→終了→再起動→再接続まで未検証
+P0: `vendor/supabase-lite.js` のAuth/PostgREST/Storage互換性を実認証で未検証
+P1: 第5号系帳票の確定レイアウト出力がない
+P1: JSONバックアップはメタデータ出力のみで、復元処理・Storage原本復旧方針が未完成
+P1: Supabase Performance AdvisorのRLS initplan WARNが実ポリシー表示と不整合で、原因未確定
+P1: GitHub Pages未公開
+
+## 15. 次の固定順序
+1. G2残作業（帳票・復元）
+2. `QA_MATRIX.md` に基づく静的QA + DB QA
+3. Red Team内部実行
+4. Draft PR作成
+5. GitHub Pages候補公開
 6. iPhone/Windows実機・実データ往復
 7. 不具合修正→再検証
 8. 運用手順確定
