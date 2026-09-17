@@ -1,5 +1,5 @@
-const CACHE='ytm-crew-ledger-20260918-2';
-const CORE=['./','./index.html','./styles.css','./app.js','./config.js','./manifest.webmanifest','./assets/icon.svg','./assets/ytm-logo.svg'];
+const CACHE='ytm-crew-ledger-20260918-3';
+const CORE=['./','./index.html','./styles.css','./app.js','./vendor/supabase-lite.js','./config.js','./manifest.webmanifest','./assets/icon.svg','./assets/ytm-logo.svg'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{
