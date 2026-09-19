@@ -1,0 +1,26 @@
+name: Internal QA
+
+on:
+  push:
+    branches:
+      - recovery/production-gates
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check app.js
+          node --check vendor/supabase-lite.js
+          node --check sw.js
+      - name: Deterministic static audit
+        run: node qa/static-check.mjs
